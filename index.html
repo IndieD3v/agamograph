@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Interactive Gallery</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400&family=Playfair+Display:ital,wght@0,500;1,400&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --wall-bg: #f2f0e9;
+            --art-width: 600px;
+            --art-height: 400px;
+            --button-bg: #2a2a2a;
+            --button-text: #ffffff;
+            --capture-border: #7db091;
+        }
+
+        body {
+            background-color: var(--wall-bg);
+            margin: 0;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Montserrat', sans-serif;
+            background-image: radial-gradient(#e8e6df 1px, transparent 1px);
+            background-size: 20px 20px;
+            color: #333;
+        }
+
+        /* --- Webcam Capture Interface (Hidden by default) --- */
+        .capture-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 4px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.1);
+            position: absolute;
+            z-index: 50;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .capture-area.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .capture-area h2 {
+            font-family: 'Playfair Display', serif;
+            margin-top: 0;
+        }
+
+        video {
+            width: var(--art-width);
+            height: var(--art-height);
+            background-color: #000;
+            border: 1px solid #ddd;
+            object-fit: cover;
+            transform: scaleX(-1); /* Mirror effect */
+        }
+
+        .capture-buttons {
+            margin-top: 20px;
+            display: flex;
+            gap: 15px;
+        }
+
+        /* --- Shared Button Styles --- */
+        button {
+            background-color: var(--button-bg);
+            color: var(--button-text);
+            border: none;
+            padding: 12px 30px;
+            border-radius: 50px;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* --- Agamograph Display --- */
+        .agamograph-container {
+            width: var(--art-width);
+            height: var(--art-height);
+            perspective: 1500px; 
+            position: relative;
+            z-index: 10;
+            /* Floating effect */
+    
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+        
+        /* Class to hide the art when capturing */
+        .agamograph-container.faded {
+            opacity: 0.1;
+            filter: blur(5px);
+            pointer-events: none;
+        }
+
+        .agamograph {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            transform-style: preserve-3d;
+            will-change: transform;
+                  box-shadow: 0 30px 60px -10px rgba(0,0,0,0.2); 
+        }
+
+        .strip {
+            flex: 1;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+        }
+
+        .face {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            backface-visibility: hidden;
+            background-size: var(--art-width) var(--art-height);
+            background-repeat: no-repeat;
+            filter: contrast(0.95) brightness(1.02);
+        }
+
+        .face-left { transform: rotateY(45deg); }
+        .face-right { transform: rotateY(-45deg) translateZ(1px); }
+
+        /* --- Placard & Controls --- */
+        .gallery-info {
+            margin-top: 60px;
+            text-align: center;
+            z-index: 10;
+            transition: opacity 0.3s;
+        }
+        .gallery-info.hidden { opacity: 0; pointer-events: none; }
+
+        .placard h2 {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.4rem;
+            color: #222;
+            margin: 0;
+        }
+        .placard p {
+            font-size: 0.75rem;
+            color: #666;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-top: 5px;
+        }
+
+        .main-controls {
+            margin-top: 30px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .secondary-btn {
+            background-color: transparent;
+            color: #555;
+            border: 1px solid #ccc;
+        }
+        .secondary-btn:hover {
+            background-color: #fff;
+            color: #000;
+        }
+
+        .hidden { display: none !important; }
+
+    </style>
+</head>
+<body>
+
+    <div class="agamograph-container" id="agamographDisplay">
+        <div class="agamograph" id="agamograph">
+            </div>
+    </div>
+
+    <div class="gallery-info" id="galleryInfo">
+        <div class="placard" id="placardText">
+            <h2 id="artTitle">The Renaissance</h2>
+            <p id="artSubtitle">Botticelli &bull; Michelangelo</p>
+        </div>
+
+        <div class="main-controls">
+            <button id="startCaptureBtn">Create Your Own Portrait</button>
+            <button id="resetDefaultBtn" class="hidden secondary-btn">Reset to Gallery</button>
+        </div>
+    </div>
+
+    <div class="capture-area" id="captureArea">
+        <h2>Capture Portrait</h2>
+        <video id="webcamVideo" autoplay playsinline></video>
+        <div class="capture-buttons">
+            <button id="captureBtn1" disabled>Take Photo 1</button>
+            <button id="captureBtn2" disabled>Take Photo 2</button>
+            <button id="cancelBtn" class="secondary-btn">Cancel</button>
+        </div>
+        <canvas id="canvas" class="hidden"></canvas>
+    </div>
+
+    <script>
+        // --- Elements ---
+        const agamographDisplay = document.getElementById('agamographDisplay');
+        const agamographContainer = document.getElementById('agamograph');
+        const galleryInfo = document.getElementById('galleryInfo');
+        const captureArea = document.getElementById('captureArea');
+        
+        const webcamVideo = document.getElementById('webcamVideo');
+        const canvas = document.getElementById('canvas');
+        
+        // Buttons
+        const startCaptureBtn = document.getElementById('startCaptureBtn');
+        const resetDefaultBtn = document.getElementById('resetDefaultBtn');
+        const captureBtn1 = document.getElementById('captureBtn1');
+        const captureBtn2 = document.getElementById('captureBtn2');
+        const cancelBtn = document.getElementById('cancelBtn');
+
+        // Text
+        const artTitle = document.getElementById('artTitle');
+        const artSubtitle = document.getElementById('artSubtitle');
+
+        // --- Configuration ---
+        const config = {
+            width: 600,
+            height: 400,
+            strips: 30,
+            maxRotation: 45
+        };
+        
+        // Default Renaissance Images
+        const defaultImg1 = 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0b/Sandro_Botticelli_-_La_nascita_di_Venere_-_Google_Art_Project_-_edited.jpg/1280px-Sandro_Botticelli_-_La_nascita_di_Venere_-_Google_Art_Project_-_edited.jpg';
+        const defaultImg2 = 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Michelangelo_-_Creation_of_Adam_%28cropped%29.jpg/1280px-Michelangelo_-_Creation_of_Adam_%28cropped%29.jpg';
+
+        let stream;
+        let capturedImage1 = null;
+        let capturedImage2 = null;
+
+        // --- 1. Initialization (Load Default Art) ---
+        function init() {
+            buildAgamograph(defaultImg1, defaultImg2);
+            animate();
+        }
+
+        // --- 2. Agamograph Builder ---
+        function buildAgamograph(img1, img2) {
+            const stripWidth = config.width / config.strips;
+            agamographContainer.innerHTML = ''; // Clear
+
+            for (let i = 0; i < config.strips; i++) {
+                const strip = document.createElement('div');
+                strip.classList.add('strip');
+
+                const faceLeft = document.createElement('div');
+                faceLeft.classList.add('face', 'face-left');
+                faceLeft.style.backgroundPosition = `-${i * stripWidth}px 0`;
+                faceLeft.style.backgroundImage = `url('${img1}')`;
+
+                const faceRight = document.createElement('div');
+                faceRight.classList.add('face', 'face-right');
+                faceRight.style.backgroundPosition = `-${i * stripWidth}px 0`;
+                faceRight.style.backgroundImage = `url('${img2}')`;
+
+                // Shadow overlay
+                const shading = document.createElement('div');
+                shading.style.position = 'absolute';
+                shading.style.width = '100%';
+                shading.style.height = '100%';
+                shading.style.background = 'linear-gradient(to right, rgba(0,0,0,0.1), transparent, rgba(0,0,0,0.1))';
+                shading.style.pointerEvents = 'none';
+
+                strip.appendChild(faceLeft);
+                strip.appendChild(faceRight);
+                strip.appendChild(shading);
+                agamographContainer.appendChild(strip);
+            }
+        }
+
+        // --- 3. Webcam Logic ---
+        async function startWebcam() {
+            try {
+                // Fade out art, show UI
+                agamographDisplay.classList.add('faded');
+                galleryInfo.classList.add('hidden');
+                captureArea.classList.add('active');
+
+                stream = await navigator.mediaDevices.getUserMedia({ video: { width: config.width, height: config.height } });
+                webcamVideo.srcObject = stream;
+                webcamVideo.onloadedmetadata = () => {
+                    webcamVideo.play();
+                    captureBtn1.disabled = false;
+                    captureBtn2.disabled = false;
+                    
+                    // Reset button states
+                    captureBtn1.textContent = "Take Photo 1";
+                    captureBtn1.style.backgroundColor = '#2a2a2a';
+                    captureBtn2.textContent = "Take Photo 2";
+                    captureBtn2.style.backgroundColor = '#2a2a2a';
+                    capturedImage1 = null;
+                    capturedImage2 = null;
+                };
+            } catch (err) {
+                console.error(err);
+                alert("Camera access needed.");
+                closeCapture();
+            }
+        }
+
+        function stopWebcam() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+        }
+
+        function closeCapture() {
+            stopWebcam();
+            captureArea.classList.remove('active');
+            agamographDisplay.classList.remove('faded');
+            galleryInfo.classList.remove('hidden');
+        }
+
+        function capturePhoto(num) {
+            canvas.width = config.width;
+            canvas.height = config.height;
+            const ctx = canvas.getContext('2d');
+            
+            // Draw and Flip
+            ctx.translate(config.width, 0);
+            ctx.scale(-1, 1);
+            ctx.drawImage(webcamVideo, 0, 0, config.width, config.height);
+            
+            const data = canvas.toDataURL('image/jpeg');
+            
+            if (num === 1) {
+                capturedImage1 = data;
+                captureBtn1.textContent = "Done";
+                captureBtn1.style.backgroundColor = '#7db091';
+                captureBtn1.disabled = true;
+            } else {
+                capturedImage2 = data;
+                captureBtn2.textContent = "Done";
+                captureBtn2.style.backgroundColor = '#7db091';
+                captureBtn2.disabled = true;
+            }
+
+            // Check if both done
+            if (capturedImage1 && capturedImage2) {
+                setTimeout(() => {
+                    applyCustomArt();
+                }, 500);
+            }
+        }
+
+        function applyCustomArt() {
+            stopWebcam();
+            captureArea.classList.remove('active');
+            agamographDisplay.classList.remove('faded');
+            galleryInfo.classList.remove('hidden');
+
+            // Update Art
+            buildAgamograph(capturedImage1, capturedImage2);
+            
+            // Update Text
+            artTitle.textContent = "Self Portrait";
+            artSubtitle.textContent = "Digital Agamograph • 2024";
+            
+            // Toggle Buttons
+            startCaptureBtn.textContent = "Retake Photos";
+            resetDefaultBtn.classList.remove('hidden');
+        }
+
+        function resetToDefault() {
+            buildAgamograph(defaultImg1, defaultImg2);
+            artTitle.textContent = "The Renaissance";
+            artSubtitle.textContent = "Botticelli • Michelangelo";
+            startCaptureBtn.textContent = "Create Your Own Portrait";
+            resetDefaultBtn.classList.add('hidden');
+        }
+
+        // --- 4. Physics Loop ---
+        let mouseX = window.innerWidth / 2;
+        let targetRotation = 0;
+        let currentRotation = 0;
+
+        document.addEventListener('mousemove', e => {
+            mouseX = e.clientX;
+            const decimal = mouseX / window.innerWidth;
+            targetRotation = config.maxRotation - (decimal * (config.maxRotation * 2));
+        });
+        
+        // Simple animation loop
+        function animate() {
+            currentRotation += (targetRotation - currentRotation) * 0.05;
+            agamographContainer.style.transform = `rotateY(${currentRotation}deg)`;
+            requestAnimationFrame(animate);
+        }
+
+        // --- Event Listeners ---
+        startCaptureBtn.addEventListener('click', startWebcam);
+        cancelBtn.addEventListener('click', closeCapture);
+        resetDefaultBtn.addEventListener('click', resetToDefault);
+        captureBtn1.addEventListener('click', () => capturePhoto(1));
+        captureBtn2.addEventListener('click', () => capturePhoto(2));
+
+        // Run
+        init();
+
+    </script>
+</body>
+</html>
