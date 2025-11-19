@@ -18,6 +18,26 @@
             --capture-border: #7db091;
         }
 
+      /* --- Mobile Responsiveness --- */
+        @media (max-width: 768px) {
+            .capture-area h2 { font-size: 1.1rem; }
+            .placard h2 { font-size: 1.1rem; }
+            .placard p { font-size: 0.65rem; }
+            
+            /* Ensure video and buttons fit new size */
+            video { width: 90vw; height: 60vw; }
+     
+            .capture-buttons {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            button {
+                padding: 10px 20px;
+                font-size: 0.75rem;
+            }
+        }
+      
         body {
             background-color: var(--wall-bg);
             margin: 0;
